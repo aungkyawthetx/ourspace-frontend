@@ -4,8 +4,7 @@ const client = axios.create({
     // laravel backend url
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
 
-    // 2. IMPORTANT: Allow cookies to be sent with requests
-    // This is required for Laravel Sanctum's session-based auth
+    // required for Laravel Sanctum's session-based auth
     withCredentials: true,
 
     // 3. Standard Headers

@@ -1,8 +1,8 @@
 import './App.css';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/dashboard';
-import Login from './pages/Login'; // to create
+import Login from './pages/Login';
 import PartnerLink from './pages/PartnerLink';
 import ProtectedRoute from './components/ProtectedRoute';
 import client from './lib/axios';
@@ -17,7 +17,7 @@ function App() {
     //fetches logged-in user data from Laravel
     const fetchUser = async () => {
       try {
-        const response = await client.get('/user');
+        const response = await client.get('/api/user');
         setUser(response.data);
       } catch (error) {
         console.log('User is not authenticated.', error.message);
