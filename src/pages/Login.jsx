@@ -17,14 +17,66 @@ const Login = ({ setUser }) => {
 
     try {
       // get CSRF cookie => make sure XSRF-TOKEN cookie is set in the browser
+      console.log('Step 1: Getting CSRF cookie...');
       await client.get('/sanctum/csrf-cookie');
+      console.log('CSRF cookie obtained');
 
-      // submit credentials
-      await client.post('/login', { email, password });
+      // submit credentials - try /api/login first, fallback to /login
+      console.log('Step 2: Attempting login...');
+      let loginSuccess = false;
+      try {
+        const loginResponse = await client.post('/login', { email, password });
+        console.log('Login successful via /login', loginResponse);
+        loginSuccess = true;
+      } catch (loginErr) {
+        // If /api/login fails with 404, try /login (web route)
+        if (loginErr.response?.status === 404) {
+          console.log('Trying /login instead...');
+          const loginResponse = await client.post('/login', { email, password });
+          console.log('Login successful via /login', loginResponse);
+          loginSuccess = true;
+        } else {
+          throw loginErr;
+        }
+      }
+
+      if (!loginSuccess) {
+        throw new Error('Login failed');
+      }
+
+      // Log cookies after login to verify session is set
+      console.log('Cookies after login:', document.cookie);
+      
+      // Small delay to ensure session is fully established
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Fetch the authenticated user data
-      const userResponse = await client.get('/user');
-      setUser(userResponse.data);
+      console.log('Step 3: Fetching user data...');
+      console.log('Cookies before /api/user request:', document.cookie);
+      
+      try {
+        const userResponse = await client.get('/api/user');
+        console.log('User data fetched:', userResponse.data);
+        setUser(userResponse.data);
+      } catch (userErr) {
+        console.error('Error fetching user:', userErr);
+        console.error('User error response:', userErr.response?.data);
+        console.error('User error status:', userErr.response?.status);
+        
+        // If /api/user fails, try /user (web route)
+        if (userErr.response?.status === 401 || userErr.response?.status === 404) {
+          console.log('Trying /user instead of /api/user...');
+          try {
+            const userResponse = await client.get('/user');
+            console.log('User data fetched via /user:', userResponse.data);
+            setUser(userResponse.data);
+          } catch (fallbackErr) {
+            throw userErr; // Throw original error
+          }
+        } else {
+          throw userErr;
+        }
+      }
 
     } catch (err) {
       console.error('Login error:', err);
@@ -32,6 +84,9 @@ const Login = ({ setUser }) => {
       console.error('Error response data:', err.response?.data);
       console.error('Error status:', err.response?.status);
       console.error('Error message:', err.message);
+      console.error('Request URL:', err.config?.url);
+      console.error('Base URL:', err.config?.baseURL);
+      console.error('Full URL:', err.config?.baseURL + err.config?.url);
 
       if (err.response) {
         const status = err.response.status;
@@ -41,11 +96,16 @@ const Login = ({ setUser }) => {
           const validationError = data.errors?.email?.[0] || data.errors?.password?.[0] || data.message;
           setError(validationError || 'Validation failed. Please check your input.');
         } 
-        else if (status === 401) { // wrong credentials
-          setError(data.message || 'Invalid email or password. Please try again.');
+        else if (status === 401) { // wrong credentials or unauthenticated
+          const errorUrl = err.config?.url || 'unknown endpoint';
+          if (errorUrl.includes('/user')) {
+            setError('Authentication failed after login. Session may not be persisting. Check backend session configuration.');
+          } else {
+            setError(data.message || 'Invalid email or password. Please try again.');
+          }
         } 
         else if (status === 404) { // route not found
-          setError('Login endpoint not found. Please check your configuration.');
+          setError(`Login endpoint not found (404). Trying: ${err.config?.baseURL}${err.config?.url}. Check your backend routes.`);
         } 
         else if (status === 500) { // Server error
           setError(data.message || 'Server error. Please try again later.');
@@ -54,7 +114,9 @@ const Login = ({ setUser }) => {
           setError(data.message || data.error || `Login failed (${status}). Please try again.`);
         }
       } else if (err.request) { // Network error
-        setError('Network error. Check that the API server is running and CORS is configured correctly.');
+        const baseURL = err.config?.baseURL || 'http://localhost:8000';
+        const attemptedURL = baseURL + (err.config?.url || '/login');
+        setError(`Network error: Cannot reach ${attemptedURL}. Check: 1) Backend is running on port 8000, 2) CORS is configured, 3) No firewall blocking.`);
       } else {
         setError(err.message || 'Login failed. Check credentials.');
       }

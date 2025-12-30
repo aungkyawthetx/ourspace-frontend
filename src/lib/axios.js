@@ -1,8 +1,18 @@
 import axios from 'axios';
 
+// In development, use relative paths to go through Vite proxy
+// In production, use the full URL from env variable
+const baseURL = import.meta.env.PROD 
+    ? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000')
+    : ''; // Empty string means use relative paths (goes through Vite proxy)
+
+// Log the base URL for debugging
+console.log('API Base URL:', baseURL || '(using Vite proxy)');
+console.log('Environment:', import.meta.env.MODE);
+
 const client = axios.create({
-    // laravel backend url
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+    // laravel backend url - empty in dev (uses Vite proxy), full URL in production
+    baseURL: baseURL,
 
     // required for Laravel Sanctum's session-based auth
     withCredentials: true,
@@ -25,6 +35,12 @@ client.interceptors.request.use(
             // Set it as a header for Laravel Sanctum
             config.headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfToken);
         }
+        
+        // Log cookies for debugging (only in dev)
+        if (import.meta.env.DEV && config.url) {
+            console.log(`[${config.method?.toUpperCase()}] ${config.url} - Cookies:`, document.cookie);
+        }
+        
         return config;
     },
     (error) => {

@@ -29,7 +29,7 @@ const Register = ({ setUser }) => {
       });
 
       // Fetch newly authenticated user's data
-      const userResponse = await client.get('/user');
+      const userResponse = await client.get('/api/user');
       setUser(userResponse.data);
 
     } catch (err) {

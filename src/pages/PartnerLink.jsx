@@ -51,7 +51,7 @@ const PartnerLink = ({ setUser }) => {
 
     try {
       await client.get('/sanctum/csrf-cookie');
-      const res = await client.post('/couple/link', { code: joinCode });
+      const res = await client.post('/api/couple/link', { code: joinCode });
       // Update local user state to reflect they are now linked
       // Assuming res.data.couple_id exists
       setUser(prev => ({ ...prev, couple_id: res.data.couple_id }));
