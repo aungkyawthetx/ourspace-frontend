@@ -36,7 +36,6 @@ const Login = ({ setUser }) => {
         console.error('User error response:', userErr.response?.data);
         console.error('User error status:', userErr.response?.status);
       }
-
     } 
     catch (err) {
       console.error('Login error:', err);

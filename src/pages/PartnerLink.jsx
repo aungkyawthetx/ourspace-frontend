@@ -10,7 +10,6 @@ const PartnerLink = ({ setUser }) => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  // Form States
   const [email, setEmail] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [generatedCode, setGeneratedCode] = useState(null);
@@ -25,25 +24,25 @@ const PartnerLink = ({ setUser }) => {
     try {
       await client.get('/sanctum/csrf-cookie');
       const res = await client.post('/api/couple/invite', { email });
-      setGeneratedCode(res.data.code); // Backend should return the code
-    } catch (err) {
-      console.log(err.response); // Validation Errors
+      setGeneratedCode(res.data.code);
+    } 
+    catch (err) {
+      console.log(err.response);
       if (err.response?.status === 422) {
         const firstError = Object.values(err.response.data.errors)[0][0];
         setError(firstError);
-      } 
-      else if (err.response?.data?.message) { // Server Message
+      } else if (err.response?.data?.message) {
         setError(err.response.data.message);
-      } 
-      else { // Fallback
+      } else {
         setError('Server error. Check console for details.');
       }
-    } finally {
+    } 
+    finally {
       setLoading(false);
     }
   };
 
-  // 2. Handle Joining via Code
+  //join code
   const handleJoin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -52,15 +51,13 @@ const PartnerLink = ({ setUser }) => {
     try {
       await client.get('/sanctum/csrf-cookie');
       const res = await client.post('/api/couple/link', { code: joinCode });
-      // Update local user state to reflect they are now linked
-      // Assuming res.data.couple_id exists
       setUser(prev => ({ ...prev, couple_id: res.data.couple_id }));
-
-      // Redirect to dashboard
       navigate('/dashboard');
-    } catch (err) {
+    } 
+    catch (err) {
       setError(err.response?.data?.message || 'Invalid code');
-    } finally {
+    } 
+    finally {
       setLoading(false);
     }
   };

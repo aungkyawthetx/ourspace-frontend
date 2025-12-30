@@ -14,7 +14,6 @@ function App() {
 
   // auth check on load
   useEffect(() => {
-    //fetches logged-in user data from Laravel
     const fetchUser = async () => {
       try {
         const response = await client.get('/api/user');
