@@ -107,11 +107,11 @@ const Login = ({ setUser }) => {
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-xl text-center">
+            <div className="px-3 bg-red-50 text-red-600 text-sm rounded-xl text-center">
               {error}
             </div>
           )}
-
+    
           <button type="submit"
             disabled={loading}
             className="w-full bg-rose-400 hover:bg-rose-500 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-6 cursor-pointer"
