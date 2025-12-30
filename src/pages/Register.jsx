@@ -28,11 +28,12 @@ const Register = ({ setUser }) => {
         password_confirmation: passwordConfirmation
       });
 
-      // Fetch newly authenticated user's data
+      // fetch user
       const userResponse = await client.get('/api/user');
       setUser(userResponse.data);
 
-    } catch (err) {
+    } 
+    catch (err) {
       console.error('Registration error:', err);
       console.error('Error response:', err.response);
       console.error('Error response data:', err.response?.data);

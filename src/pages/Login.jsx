@@ -16,69 +16,29 @@ const Login = ({ setUser }) => {
     setError('');
 
     try {
-      // get CSRF cookie => make sure XSRF-TOKEN cookie is set in the browser
       console.log('Step 1: Getting CSRF cookie...');
       await client.get('/sanctum/csrf-cookie');
       console.log('CSRF cookie obtained');
 
-      // submit credentials - try /api/login first, fallback to /login
-      console.log('Step 2: Attempting login...');
-      let loginSuccess = false;
-      try {
-        const loginResponse = await client.post('/login', { email, password });
-        console.log('Login successful via /login', loginResponse);
-        loginSuccess = true;
-      } catch (loginErr) {
-        // If /api/login fails with 404, try /login (web route)
-        if (loginErr.response?.status === 404) {
-          console.log('Trying /login instead...');
-          const loginResponse = await client.post('/login', { email, password });
-          console.log('Login successful via /login', loginResponse);
-          loginSuccess = true;
-        } else {
-          throw loginErr;
-        }
-      }
+      const loginResponse = await client.post('/login', { email, password }); //submit credentials
+      console.log('Login successful via /login', loginResponse);
 
-      if (!loginSuccess) {
-        throw new Error('Login failed');
-      }
-
-      // Log cookies after login to verify session is set
-      console.log('Cookies after login:', document.cookie);
-      
-      // Small delay to ensure session is fully established
+      console.log('Cookies after login:', document.cookie); //Log cookies
       await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Fetch the authenticated user data
-      console.log('Step 3: Fetching user data...');
-      console.log('Cookies before /api/user request:', document.cookie);
       
       try {
         const userResponse = await client.get('/api/user');
-        console.log('User data fetched:', userResponse.data);
+        // console.log('User data fetched:', userResponse.data);
         setUser(userResponse.data);
-      } catch (userErr) {
+      } 
+      catch (userErr) {
         console.error('Error fetching user:', userErr);
         console.error('User error response:', userErr.response?.data);
         console.error('User error status:', userErr.response?.status);
-        
-        // If /api/user fails, try /user (web route)
-        if (userErr.response?.status === 401 || userErr.response?.status === 404) {
-          console.log('Trying /user instead of /api/user...');
-          try {
-            const userResponse = await client.get('/user');
-            console.log('User data fetched via /user:', userResponse.data);
-            setUser(userResponse.data);
-          } catch (fallbackErr) {
-            throw userErr; // Throw original error
-          }
-        } else {
-          throw userErr;
-        }
       }
 
-    } catch (err) {
+    } 
+    catch (err) {
       console.error('Login error:', err);
       console.error('Error response:', err.response);
       console.error('Error response data:', err.response?.data);
