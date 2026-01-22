@@ -108,7 +108,7 @@ const PartnerLink = ({ setUser }) => {
                   </form>
                 ) :
                   (
-                    <div className="bg-love-50 border border-love-100 rounded-xl p-4 text-center">
+                    <div className="bg-love-50 border border-gray-400 rounded-xl p-4 text-center">
                       <p className="text-sm text-gray-600 mb-2"> Share this code with your partner: </p>
                       <div onClick={copyToClipboard} className="flex items-center justify-between bg-white border border-dashed border-love-300 rounded-lg px-4 py-3 cursor-pointer hover:border-love-500 transition-colors group">
                         <span className="font-mono text-xl font-bold text-gray-700 tracking-widest"> {generatedCode} </span>

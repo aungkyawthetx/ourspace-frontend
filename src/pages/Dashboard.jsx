@@ -27,6 +27,7 @@ const Dashboard = () => {
               <Heart size={16} className="text-love-500 fill-love-500"/>
               <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{daysTogether} Days</span>
             </div>
+            <button onClick={handleLogout}> Logout </button>
           </div>
         </div>
       </nav>
