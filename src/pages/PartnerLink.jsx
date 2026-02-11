@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Link as LinkIcon, Copy, Check } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import client from '../lib/axios';
 import { useNavigate } from 'react-router-dom';
 

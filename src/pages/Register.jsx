@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { UserPlus } from 'lucide-react';
+import { motion } from 'framer-motion';
 import client from '../lib/axios';
 import { Link } from 'react-router-dom';
 

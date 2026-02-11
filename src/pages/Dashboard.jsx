@@ -1,109 +1,253 @@
-import React, { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Heart, Image as ImageIcon, Plus, Smile } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Heart, Calendar, Music, Image as ImageIcon, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import client from '../lib/axios';
 
-const Dashboard = () => {
-  // Mock Data (Replace with API call later)
-  const [mood, setMood] = useState('Happy');
-  const daysTogether = 142;
+const moodOptions = ['happy', 'excited', 'loved', 'calm', 'tired', 'sad', 'stressed'];
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+const Dashboard = ({ setUser }) => {
+  const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [dashboard, setDashboard] = useState(null);
+  const [error, setError] = useState('');
+
+  const [mood, setMood] = useState('happy');
+  const [savingMood, setSavingMood] = useState(false);
+
+  const [memoryForm, setMemoryForm] = useState({
+    image_path: '',
+    caption: '',
+    date_occurred: new Date().toISOString().slice(0, 10),
+  });
+  const [savingMemory, setSavingMemory] = useState(false);
+
+  const fetchDashboard = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await client.get('/api/dashboard');
+      setDashboard(response.data);
+      setMood(response.data?.user?.mood || 'happy');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not load dashboard data.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const item = {
-    hidden: { y: 20, opacity: 0 },
-    show: { y: 0, opacity: 1 }
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await client.get('/sanctum/csrf-cookie');
+      await client.post('/logout');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    } finally {
+      setUser(null);
+      navigate('/login', { replace: true });
+    }
   };
+
+  const handleMoodSubmit = async (event) => {
+    event.preventDefault();
+    setSavingMood(true);
+    setError('');
+
+    try {
+      await client.get('/sanctum/csrf-cookie');
+      await client.post('/api/mood', { mood });
+      setDashboard((prev) => ({
+        ...prev,
+        user: { ...prev.user, mood },
+      }));
+      setUser((prev) => ({ ...prev, mood }));
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update mood.');
+    } finally {
+      setSavingMood(false);
+    }
+  };
+
+  const handleMemorySubmit = async (event) => {
+    event.preventDefault();
+    setSavingMemory(true);
+    setError('');
+
+    try {
+      await client.get('/sanctum/csrf-cookie');
+      const response = await client.post('/api/memories', memoryForm);
+
+      setDashboard((prev) => ({
+        ...prev,
+        couple: {
+          ...prev.couple,
+          memories: [response.data.memory, ...(prev?.couple?.memories || [])],
+        },
+      }));
+
+      setMemoryForm((prev) => ({
+        ...prev,
+        image_path: '',
+        caption: '',
+      }));
+    } catch (err) {
+      if (err.response?.status === 422 && err.response?.data?.errors) {
+        const firstError = Object.values(err.response.data.errors)[0]?.[0];
+        setError(firstError || 'Please check your memory details.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to save memory.');
+      }
+    } finally {
+      setSavingMemory(false);
+    }
+  };
+
+  const partnerMoodText = useMemo(() => {
+    if (!dashboard?.partner) return 'No partner linked yet.';
+    return `${dashboard.partner.name} is feeling ${dashboard.partner.mood || 'happy'} today.`;
+  }, [dashboard]);
+
+  const memories = dashboard?.couple?.memories || [];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-love-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-love-500"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-love-50 dark:bg-night-900 text-slate-800 dark:text-gray-100 transition-colors duration-300">
-      <nav className="sticky top-0 w-full z-50 bg-white/80 dark:bg-night-800/80 backdrop-blur-lg border-b border-gray-200/50 dark:border-gray-700/50 shadow-sm">
+    <div className="min-h-screen bg-love-50 text-slate-800">
+      <nav className="sticky top-0 w-full z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200/50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <h1 className="text-2xl font-serif font-bold text-love-600 dark:text-love-400">OurSpace</h1>
-            <div className="bg-white dark:bg-night-800 px-4 py-2 rounded-full shadow-md flex items-center gap-2 border border-gray-200/50 dark:border-gray-700/50">
-              <Heart size={16} className="text-love-500 fill-love-500"/>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{daysTogether} Days</span>
-            </div>
-            <button onClick={handleLogout}> Logout </button>
+          <div className="flex justify-between items-center h-16 gap-4">
+            <h1 className="text-2xl font-serif font-bold text-love-600">OurSpace</h1>
+            <button
+              onClick={handleLogout}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </nav>
 
-      {/* Main Content */}
-      <div className="px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto py-8 pb-20">
-        {/* Hero Section */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
+      <div className="px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto py-8 pb-20">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white dark:bg-night-800 rounded-3xl p-8 shadow-xl mb-8 flex flex-col items-center text-center relative overflow-hidden"
+          className="bg-white rounded-3xl p-8 shadow-xl mb-8 flex flex-col items-center text-center relative overflow-hidden"
         >
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-love-100 via-love-500 to-love-100"></div>
-          <h2 className="text-3xl font-serif mb-2 text-gray-800 dark:text-gray-100">Good Morning, Alex</h2>
-          <p className="text-slate-500 dark:text-slate-400">Sarah is feeling <span className="text-love-500 dark:text-love-400 font-bold">{mood}</span> today.</p>
+          <h2 className="text-3xl font-serif mb-2 text-gray-800">
+            Welcome, {dashboard?.user?.name}
+          </h2>
+          <p className="text-slate-500">
+            <Heart size={16} className="inline mr-1 text-love-500 fill-love-500" />
+            {partnerMoodText}
+          </p>
         </motion.div>
 
-        {/* Feature Grid */}
-        <motion.div 
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 gap-6"
-        >
-          
-          {/* Card 1: Shared Tasks */}
-          <motion.div variants={item} className="bg-white dark:bg-night-800 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold flex items-center gap-2"><CheckCircle size={18} className="text-love-500"/> Tasks</h3>
-            </div>
-            <ul className="space-y-3">
-              <li className="flex items-center gap-3 text-sm opacity-60 line-through">
-                <div className="w-4 h-4 border rounded bg-love-500 border-love-500"></div>
-                Buy groceries
-              </li>
-              <li className="flex items-center gap-3 text-sm">
-                <div className="w-4 h-4 border border-love-500 rounded"></div>
-                Plan weekend trip
-              </li>
-            </ul>
-          </motion.div>
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
+            {error}
+          </div>
+        )}
 
-          {/* Card 2: Memories */}
-          <motion.div variants={item} className="bg-white dark:bg-night-800 p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold flex items-center gap-2"><ImageIcon size={18} className="text-purple-500"/> Memories</h3>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-               {/* Placeholders for images */}
-               <div className="aspect-square bg-love-100 rounded-lg"></div>
-               <div className="aspect-square bg-love-100 rounded-lg"></div>
-               <div className="aspect-square bg-love-100 rounded-lg flex items-center justify-center text-love-500 text-xs font-bold">+5</div>
-            </div>
-          </motion.div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <section className="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 className="font-semibold flex items-center gap-2 mb-4">
+              <Smile size={18} className="text-love-500" />
+              Your Mood
+            </h3>
+            <form onSubmit={handleMoodSubmit} className="space-y-4">
+              <select
+                value={mood}
+                onChange={(e) => setMood(e.target.value)}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-love-300"
+              >
+                {moodOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                disabled={savingMood}
+                className="w-full rounded-xl bg-rose-400 py-2.5 font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+              >
+                {savingMood ? 'Saving...' : 'Update Mood'}
+              </button>
+            </form>
+          </section>
 
-           {/* Card 3: Music Sync */}
-           <motion.div variants={item} className="md:col-span-2 bg-gradient-to-r from-indigo-500 to-purple-600 p-6 rounded-2xl shadow-lg text-white">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/20 rounded-full">
-                        <Music size={24} />
-                    </div>
-                    <div>
-                        <h3 className="font-bold">Listening Together</h3>
-                        <p className="text-sm opacity-80">Lover - Taylor Swift</p>
-                    </div>
-                </div>
-                {/* Visualizer bars animation */}
-                <div className="flex gap-1 h-8 items-end">
-                    <motion.div animate={{ height: [10, 30, 15] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 bg-white rounded-full"></motion.div>
-                    <motion.div animate={{ height: [20, 10, 25] }} transition={{ repeat: Infinity, duration: 1.2 }} className="w-1 bg-white rounded-full"></motion.div>
-                    <motion.div animate={{ height: [15, 25, 10] }} transition={{ repeat: Infinity, duration: 0.9 }} className="w-1 bg-white rounded-full"></motion.div>
-                </div>
+          <section className="bg-white rounded-2xl p-6 shadow-sm">
+            <h3 className="font-semibold flex items-center gap-2 mb-4">
+              <Plus size={18} className="text-love-500" />
+              Add Couple Memory
+            </h3>
+            <form onSubmit={handleMemorySubmit} className="space-y-3">
+              <input
+                type="url"
+                placeholder="Image URL (https://...)"
+                value={memoryForm.image_path}
+                onChange={(e) => setMemoryForm((prev) => ({ ...prev, image_path: e.target.value }))}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-love-300"
+                required
+              />
+              <input
+                type="date"
+                value={memoryForm.date_occurred}
+                onChange={(e) => setMemoryForm((prev) => ({ ...prev, date_occurred: e.target.value }))}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-love-300"
+                required
+              />
+              <textarea
+                placeholder="Caption"
+                value={memoryForm.caption}
+                onChange={(e) => setMemoryForm((prev) => ({ ...prev, caption: e.target.value }))}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-love-300"
+                rows={3}
+              />
+              <button
+                type="submit"
+                disabled={savingMemory}
+                className="w-full rounded-xl bg-rose-400 py-2.5 font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+              >
+                {savingMemory ? 'Saving...' : 'Save Memory'}
+              </button>
+            </form>
+          </section>
+        </div>
+
+        <section className="bg-white rounded-2xl p-6 shadow-sm mt-6">
+          <h3 className="font-semibold flex items-center gap-2 mb-4">
+            <ImageIcon size={18} className="text-love-500" />
+            Couple Memories
+          </h3>
+          {memories.length === 0 ? (
+            <p className="text-sm text-gray-500">No memories yet. Add your first memory above.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {memories.map((memory) => (
+                <article key={memory.id} className="rounded-xl border border-gray-100 overflow-hidden">
+                  <img src={memory.image_path} alt={memory.caption || 'Memory'} className="h-48 w-full object-cover" />
+                  <div className="p-3">
+                    <p className="font-medium text-sm text-gray-800">{memory.caption || 'Untitled memory'}</p>
+                    <p className="text-xs text-gray-500 mt-1">{memory.date_occurred}</p>
+                  </div>
+                </article>
+              ))}
             </div>
-          </motion.div>
-        </motion.div>
+          )}
+        </section>
       </div>
     </div>
   );

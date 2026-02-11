@@ -1,7 +1,7 @@
 import './App.css';
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Dashboard from './pages/dashboard';
+import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import PartnerLink from './pages/PartnerLink';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -47,7 +47,7 @@ function App() {
         <Route element={<ProtectedRoute user={user} />}>
           <Route path="/" element={user?.couple_id ? <Navigate to="/dashboard" replace /> : <Navigate to="/link-partner" replace />} />
           <Route path="/link-partner" element={user?.couple_id ? <Navigate to="/dashboard" replace /> : <PartnerLink setUser={setUser} />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard setUser={setUser} />} />
         </Route>
         <Route path="*" element={<h1>404 | Page Not Found</h1>} />
       </Routes>
