@@ -80,8 +80,7 @@ const Register = ({ setUser }) => {
         animate={{ opacity: 1, y: 0 }}
         className="bg-white w-full max-w-lg rounded-3xl p-8 shadow-2xl">
         <div className="text-center mb-8">
-          <UserPlus className="mx-auto text-rose-500 fill-rose-100" size={36} />
-          <h1 className="text-3xl font-serif font-bold text-gray-800 mt-3">Create Your Account</h1>
+          <h1 className="text-3xl font-serif font-bold text-gray-800 mt-3">Create Account</h1>
           <p className="text-sm text-gray-500">Start your shared space today.</p>
         </div>
 
@@ -150,14 +149,14 @@ const Register = ({ setUser }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-rose-400 hover:bg-rose-500 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-6 cursor-pointer"
+            className="w-full bg-rose-500 hover:bg-rose-600 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-6 cursor-pointer"
           >
-            {loading ? 'Registering...' : 'Register'}
+            {loading ? 'Loading...' : 'Sign Up'}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-gray-500">
-          Already have an account? <Link to="/login" className="text-rose-400 font-medium hover:underline">Log In</Link>
+          Already have an account? <Link to="/login" className="text-rose-400 font-medium hover:underline">Sign In</Link>
         </p>
       </motion.div>
     </div>

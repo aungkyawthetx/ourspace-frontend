@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Heart, Image as ImageIcon, Plus, Smile } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Headphones, Heart, Image as ImageIcon, Plus, Smile } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import client from '../lib/axios';
@@ -22,6 +22,16 @@ const Dashboard = ({ setUser }) => {
     date_occurred: new Date().toISOString().slice(0, 10),
   });
   const [savingMemory, setSavingMemory] = useState(false);
+  const [musicForm, setMusicForm] = useState({
+    song_url: '',
+    song_title: '',
+    song_artist: '',
+  });
+  const [musicState, setMusicState] = useState(null);
+  const [savingMusic, setSavingMusic] = useState(false);
+  const [musicMessage, setMusicMessage] = useState('');
+  const audioRef = useRef(null);
+  const suppressSyncRef = useRef(false);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -30,6 +40,14 @@ const Dashboard = ({ setUser }) => {
       const response = await client.get('/api/dashboard');
       setDashboard(response.data);
       setMood(response.data?.user?.mood || 'happy');
+      setMusicState(response.data?.couple?.music || null);
+      if (response.data?.couple?.music?.song_url) {
+        setMusicForm({
+          song_url: response.data.couple.music.song_url || '',
+          song_title: response.data.couple.music.song_title || '',
+          song_artist: response.data.couple.music.song_artist || '',
+        });
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Could not load dashboard data.');
     } finally {
@@ -107,6 +125,149 @@ const Dashboard = ({ setUser }) => {
     }
   };
 
+  const getProjectedPlaybackTime = (state) => {
+    if (!state) return 0;
+
+    const base = Number(state.playback_seconds || 0);
+    if (!state.is_playing || !state.playback_updated_at) {
+      return Math.max(0, base);
+    }
+
+    const updatedAt = new Date(state.playback_updated_at).getTime();
+    if (Number.isNaN(updatedAt)) {
+      return Math.max(0, base);
+    }
+
+    const elapsedSeconds = Math.max(0, (Date.now() - updatedAt) / 1000);
+    return Math.max(0, base + elapsedSeconds);
+  };
+
+  const applyMusicStateToAudio = (state) => {
+    const audio = audioRef.current;
+    if (!audio || !state?.song_url) return;
+
+    const targetTime = getProjectedPlaybackTime(state);
+    suppressSyncRef.current = true;
+
+    if (Math.abs((audio.currentTime || 0) - targetTime) > 2) {
+      try {
+        audio.currentTime = targetTime;
+      } catch (err) {
+        console.warn('Could not seek shared audio.', err);
+      }
+    }
+
+    if (state.is_playing) {
+      const playPromise = audio.play();
+      if (playPromise?.catch) {
+        playPromise.catch(() => {});
+      }
+    } else {
+      audio.pause();
+    }
+
+    setTimeout(() => {
+      suppressSyncRef.current = false;
+    }, 200);
+  };
+
+  const handleMusicSubmit = async (event) => {
+    event.preventDefault();
+    if (!dashboard?.couple?.id) return;
+
+    setSavingMusic(true);
+    setMusicMessage('');
+    setError('');
+
+    try {
+      await client.get('/sanctum/csrf-cookie');
+      const response = await client.put('/api/music-state', {
+        song_url: musicForm.song_url,
+        song_title: musicForm.song_title || null,
+        song_artist: musicForm.song_artist || null,
+        is_playing: false,
+        playback_seconds: 0,
+      });
+
+      setMusicState(response.data.music);
+      setMusicMessage('Shared song updated.');
+    } catch (err) {
+      if (err.response?.status === 422 && err.response?.data?.errors) {
+        const firstError = Object.values(err.response.data.errors)[0]?.[0];
+        setError(firstError || 'Please check the song details.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to update shared music.');
+      }
+    } finally {
+      setSavingMusic(false);
+    }
+  };
+
+  const syncCurrentPlayback = async (isPlayingOverride) => {
+    if (suppressSyncRef.current) return;
+    if (!dashboard?.couple?.id) return;
+    if (!musicState?.song_url) return;
+    if (!audioRef.current) return;
+
+    try {
+      const nextIsPlaying = typeof isPlayingOverride === 'boolean'
+        ? isPlayingOverride
+        : !audioRef.current.paused;
+
+      await client.put('/api/music-state', {
+        song_url: musicState.song_url,
+        song_title: musicState.song_title || null,
+        song_artist: musicState.song_artist || null,
+        is_playing: nextIsPlaying,
+        playback_seconds: Math.floor(audioRef.current.currentTime || 0),
+      });
+    } catch (err) {
+      console.error('Shared playback sync failed:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!dashboard?.couple?.id) return undefined;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await client.get('/api/music-state');
+        setMusicState((prev) => {
+          const next = response.data.music;
+          if (!prev) return next;
+
+          if (
+            prev.song_url !== next.song_url ||
+            prev.song_title !== next.song_title ||
+            prev.song_artist !== next.song_artist ||
+            prev.is_playing !== next.is_playing ||
+            prev.playback_seconds !== next.playback_seconds ||
+            prev.playback_updated_at !== next.playback_updated_at
+          ) {
+            return next;
+          }
+
+          return prev;
+        });
+      } catch (err) {
+        console.error('Failed to poll shared music state:', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [dashboard?.couple?.id]);
+
+  useEffect(() => {
+    if (!musicState?.song_url) return;
+    setMusicForm((prev) => ({
+      ...prev,
+      song_url: musicState.song_url || '',
+      song_title: musicState.song_title || '',
+      song_artist: musicState.song_artist || '',
+    }));
+    applyMusicStateToAudio(musicState);
+  }, [musicState]);
+
   const partnerMoodText = useMemo(() => {
     if (!dashboard?.partner) return 'No partner linked yet.';
     return `${dashboard.partner.name} is feeling ${dashboard.partner.mood || 'happy'} today.`;
@@ -125,7 +286,7 @@ const Dashboard = ({ setUser }) => {
   return (
     <div className="min-h-screen bg-love-50 text-slate-800">
       <nav className="sticky top-0 w-full z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200/50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-4">
             <h1 className="text-2xl font-serif font-bold text-love-600">OurSpace</h1>
             <button
@@ -181,7 +342,7 @@ const Dashboard = ({ setUser }) => {
               <button
                 type="submit"
                 disabled={savingMood}
-                className="w-full rounded-xl bg-rose-400 py-2.5 font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+                className="w-full rounded-xl bg-rose-500 py-2.5 font-medium text-white hover:bg-rose-600 disabled:opacity-50"
               >
                 {savingMood ? 'Saving...' : 'Update Mood'}
               </button>
@@ -219,7 +380,7 @@ const Dashboard = ({ setUser }) => {
               <button
                 type="submit"
                 disabled={savingMemory}
-                className="w-full rounded-xl bg-rose-400 py-2.5 font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+                className="w-full rounded-xl bg-rose-500 py-2.5 font-medium text-white hover:bg-rose-600 disabled:opacity-50"
               >
                 {savingMemory ? 'Saving...' : 'Save Memory'}
               </button>
@@ -229,8 +390,83 @@ const Dashboard = ({ setUser }) => {
 
         <section className="bg-white rounded-2xl p-6 shadow-sm mt-6">
           <h3 className="font-semibold flex items-center gap-2 mb-4">
+            <Headphones size={18} className="text-love-500" />
+            Listen Together
+          </h3>
+
+          {!dashboard?.couple ? (
+            <p className="text-sm text-gray-500">Connect with a partner to start shared listening.</p>
+          ) : (
+            <div className="space-y-4">
+              <form onSubmit={handleMusicSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  type="url"
+                  placeholder="Audio URL (https://...)"
+                  value={musicForm.song_url}
+                  onChange={(e) => setMusicForm((prev) => ({ ...prev, song_url: e.target.value }))}
+                  className="md:col-span-3 w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-love-300"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="Song title"
+                  value={musicForm.song_title}
+                  onChange={(e) => setMusicForm((prev) => ({ ...prev, song_title: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-love-300"
+                />
+                <input
+                  type="text"
+                  placeholder="Artist"
+                  value={musicForm.song_artist}
+                  onChange={(e) => setMusicForm((prev) => ({ ...prev, song_artist: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-love-300"
+                />
+                <button
+                  type="submit"
+                  disabled={savingMusic}
+                  className="w-full rounded-xl bg-rose-500 py-2.5 font-medium text-white hover:bg-rose-600 disabled:opacity-50"
+                >
+                  {savingMusic ? 'Updating...' : 'Set Shared Song'}
+                </button>
+              </form>
+
+              {musicMessage && (
+                <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  {musicMessage}
+                </p>
+              )}
+
+              {musicState?.song_url ? (
+                <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
+                  <p className="text-sm font-semibold text-gray-800">
+                    {musicState.song_title || 'Shared Song'}
+                    {musicState.song_artist ? ` - ${musicState.song_artist}` : ''}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 mb-3 break-all">{musicState.song_url}</p>
+                  <audio
+                    ref={audioRef}
+                    src={musicState.song_url}
+                    controls
+                    className="w-full"
+                    onPlay={() => syncCurrentPlayback(true)}
+                    onPause={() => syncCurrentPlayback(false)}
+                    onSeeked={() => syncCurrentPlayback()}
+                    onLoadedMetadata={() => applyMusicStateToAudio(musicState)}
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No shared song yet. Add a direct audio URL and both of you can listen in sync.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="bg-white rounded-2xl p-6 shadow-sm mt-6">
+          <h3 className="font-semibold flex items-center gap-2 mb-4">
             <ImageIcon size={18} className="text-love-500" />
-            Couple Memories
+            Memories
           </h3>
           {memories.length === 0 ? (
             <p className="text-sm text-gray-500">No memories yet. Add your first memory above.</p>

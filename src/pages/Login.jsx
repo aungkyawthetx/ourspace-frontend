@@ -93,7 +93,7 @@ const Login = ({ setUser }) => {
       >
         <div className="text-center mb-8">
           <Heart className="mx-auto text-rose-500 fill-rose-100" size={36} />
-          <h1 className="text-3xl font-serif font-bold text-gray-800 mt-3">Welcome Back</h1>
+          <h1 className="text-3xl font-serif font-bold text-gray-800 mt-3">Welcome</h1>
           <p className="text-sm text-gray-500">Sign in to OurSpace</p>
         </div>
 
@@ -135,14 +135,14 @@ const Login = ({ setUser }) => {
     
           <button type="submit"
             disabled={loading}
-            className="w-full bg-rose-400 hover:bg-rose-500 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-6 cursor-pointer"
+            className="w-full bg-rose-500 hover:bg-rose-600 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-6 cursor-pointer"
           >
-            {loading ? 'Logging in...' : 'Log In'}
+            {loading ? 'Loading...' : 'Sign In'}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-gray-500">
-          Don't have an account? <Link to="/register" className="text-rose-400 font-medium hover:underline">Register Here</Link>
+          New to OurSpace? <Link to="/register" className="text-rose-400 font-medium hover:underline">Sign Up</Link>
         </p>
       </motion.div>
     </div>
